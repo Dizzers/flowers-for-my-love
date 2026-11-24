@@ -43,9 +43,9 @@
     width: min(92vw, 430px);
     padding: 30px 28px;
     border-radius: 24px;
-    background: rgba(16, 8, 30, .80);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(16, 8, 30, .84);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
     border: 1px solid rgba(255, 255, 255, .14);
     box-shadow: 0 24px 70px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .08);
     text-align: center;
@@ -176,7 +176,7 @@
 <div id="ui" class="hide">
   <div class="card" data-step="intro">
     <div class="big-heart">♥</div>
-    <h1>Привет, любимая</h1>
+    <h1>Привет, любимая полечка</h1>
     <p>Я спрятал тут кое-что из цветов и разноцветных символов.<br>
        Внутри — три вопроса и три спрятанных сердечка. Погнали?</p>
     <button class="btn" data-go="q1">Начать квест ✦</button>
@@ -288,9 +288,10 @@
   /* ---------- состояние ---------- */
   var W = 0, H = 0, DPR = 1;
   var parts = [], amb = [], sparks = [];
-  var bgGrad = null, glowGrad = null;
+  var bgCanvas = null;
   var t0 = 0, last = 0, firstBuild = true, started = false;
   var textGlow = null;
+  var LOW = false, lastDraw = 0;
 
   function pick(a) { return a[(Math.random() * a.length) | 0]; }
   function rr(a, b) { return a + Math.random() * (b - a); }
@@ -310,13 +311,14 @@
     }
     return {
       bx: tx, by: ty, x: x, y: y, vx: 0, vy: 0,
-      delay: delay, ch: ch, col: col, size: size,
+      delay: delay, ch: ch, col: col,
       k: 0.016 * rr(0.75, 1.35),
       phase: opt.phase !== undefined ? opt.phase : rr(0, Math.PI * 2),
       wobA: opt.wobA !== undefined ? opt.wobA : 1.6,
       wobF: opt.wobF !== undefined ? opt.wobF : rr(0.5, 1.1),
       tw: !!opt.tw,
-      alpha: opt.alpha !== undefined ? opt.alpha : 1
+      alpha: opt.alpha !== undefined ? opt.alpha : 1,
+      size: Math.max(6, Math.round(size))
     };
   }
 
@@ -339,11 +341,25 @@
     var scale = Math.min(fsTarget / FS, (W * 0.88) / tw);
     var img = o.getImageData(0, 0, off.width, off.height).data;
     var step = 6;
-    var cell = 5.0;
+    var cell = LOW ? 6.0 : 5.0;
     var used = Object.create(null);
     var count = 0;
     var size = Math.max(8, fsTarget * 0.16);
-    textGlow = { str: str, x: cx, y: cy, fs: FS * scale };
+
+    /* свечение рисуем один раз в offscreen и просто копируем каждый кадр */
+    var glowW = Math.ceil(tw * scale) + 140;
+    var glowH = Math.ceil(FS * scale * 1.6) + 60;
+    var gc = document.createElement('canvas');
+    gc.width = glowW; gc.height = glowH;
+    var gx = gc.getContext('2d');
+    gx.font = 'italic 600 ' + (FS * scale).toFixed(1) + 'px Georgia,"Times New Roman",serif';
+    gx.textAlign = 'center';
+    gx.textBaseline = 'middle';
+    gx.fillStyle = 'rgba(255,170,205,0.65)';
+    gx.shadowColor = 'rgba(255,120,170,0.85)';
+    gx.shadowBlur = 40;
+    gx.fillText(str, glowW / 2, glowH / 2);
+    textGlow = { img: gc, x: cx, y: cy, w: glowW, h: glowH };
 
     for (var sy = 0; sy < off.height; sy += step) {
       for (var sx = 0; sx < off.width; sx += step) {
@@ -490,14 +506,21 @@
 
     /* фон: дождь из символов */
     amb = [];
-    var n = Math.round(Math.min(190, Math.max(70, (W * H) / 9000)));
+    var cap = LOW ? 55 : 190;
+    var n = Math.round(Math.min(cap, Math.max(LOW ? 40 : 70, (W * H) / 9000)));
     for (var m = 0; m < n; m++) {
       amb.push({
         x: Math.random() * W, y: Math.random() * H,
         vy: rr(0.12, 0.5), f: rr(0.3, 0.9), ph: rr(0, 6.3), tf: rr(1, 3),
-        ch: pick(AMB), col: pick(AMB_COLORS), sz: rr(8, 16), al: rr(0.10, 0.35)
+        ch: pick(AMB), col: pick(AMB_COLORS), sz: Math.round(rr(8, 16)), al: rr(0.10, 0.35)
       });
     }
+
+    /* сортировка по размеру и цвету: шрифт и кисть меняются реже */
+    parts.sort(function (a, b) {
+      if (a.size !== b.size) return a.size - b.size;
+      return a.col < b.col ? -1 : a.col > b.col ? 1 : 0;
+    });
 
     firstBuild = false;
     t0 = performance.now();
@@ -619,7 +642,8 @@
   function resize() {
     W = fixW || window.innerWidth;
     H = fixH || window.innerHeight;
-    DPR = Math.min(2, window.devicePixelRatio || 1);
+    LOW = (W * H) < 320000;
+    DPR = Math.min(LOW ? 1.5 : 2, window.devicePixelRatio || 1);
     canvas.width = Math.round(W * DPR);
     canvas.height = Math.round(H * DPR);
     canvas.style.width = W + 'px';
@@ -628,19 +652,28 @@
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    bgGrad = ctx.createLinearGradient(0, 0, 0, H);
-    bgGrad.addColorStop(0, '#05030c');
-    bgGrad.addColorStop(0.5, '#0d0620');
-    bgGrad.addColorStop(1, '#140926');
-
+    /* фон рендерим один раз в offscreen — каждый кадр просто копия */
+    var bgC = document.createElement('canvas');
+    bgC.width = Math.max(1, Math.round(W));
+    bgC.height = Math.max(1, Math.round(H));
+    var bgx = bgC.getContext('2d');
+    var g1 = bgx.createLinearGradient(0, 0, 0, H);
+    g1.addColorStop(0, '#05030c');
+    g1.addColorStop(0.5, '#0d0620');
+    g1.addColorStop(1, '#140926');
+    bgx.fillStyle = g1;
+    bgx.fillRect(0, 0, W, H);
     var gR = Math.max(W, H) * 0.62;
-    glowGrad = ctx.createRadialGradient(W / 2, H * 0.36, 0, W / 2, H * 0.36, gR);
-    glowGrad.addColorStop(0, 'rgba(255,95,150,0.14)');
-    glowGrad.addColorStop(0.45, 'rgba(150,80,220,0.08)');
-    glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    var g2 = bgx.createRadialGradient(W / 2, H * 0.36, 0, W / 2, H * 0.36, gR);
+    g2.addColorStop(0, 'rgba(255,95,150,0.14)');
+    g2.addColorStop(0.45, 'rgba(150,80,220,0.08)');
+    g2.addColorStop(1, 'rgba(0,0,0,0)');
+    bgx.fillStyle = g2;
+    bgx.fillRect(0, 0, W, H);
+    bgCanvas = bgC;
 
     build();
-    if (!started) { started = true; last = 0; requestAnimationFrame(frame); }
+    if (!started) { started = true; last = 0; lastDraw = 0; requestAnimationFrame(frame); }
   }
 
   var rT = null;
@@ -653,17 +686,16 @@
 
   /* ---------- цикл ---------- */
   function frame(now) {
+    if (LOW && now - lastDraw < 30) { requestAnimationFrame(frame); return; }
+    lastDraw = now;
     var dt = Math.min(50, now - (last || now - 16));
     last = now;
     var h = dt / 16.666;
     var t = (now - t0) / 1000;
     var dampH = Math.pow(0.90, h);
 
-    /* фон */
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = glowGrad;
-    ctx.fillRect(0, 0, W, H);
+    /* фон — готовая копия */
+    ctx.drawImage(bgCanvas, 0, 0, W, H);
 
     /* фоновые символы */
     for (var i = 0; i < amb.length; i++) {
@@ -679,17 +711,13 @@
       ctx.fillText(a.ch, a.x, a.y);
     }
 
-    /* мягкое свечение под надписью */
+    /* мягкое свечение под надписью — копия offscreen */
     if (textGlow) {
       var gA = Math.min(1, Math.max(0, (t - 3.4) / 1.4));
       if (gA > 0) {
-        ctx.save();
-        ctx.font = 'italic 600 ' + textGlow.fs.toFixed(1) + 'px Georgia,"Times New Roman",serif';
-        ctx.fillStyle = 'rgba(255,170,205,' + (0.17 * gA).toFixed(3) + ')';
-        ctx.shadowColor = 'rgba(255,120,170,0.6)';
-        ctx.shadowBlur = 40;
-        ctx.fillText(textGlow.str, textGlow.x, textGlow.y);
-        ctx.restore();
+        ctx.globalAlpha = 0.26 * gA;
+        ctx.drawImage(textGlow.img, textGlow.x - textGlow.w / 2, textGlow.y - textGlow.h / 2);
+        ctx.globalAlpha = 1;
       }
     }
 
@@ -711,6 +739,7 @@
     }
 
     /* частицы сцены */
+    var lastSz = -1, lastCol = '';
     for (var j = 0; j < parts.length; j++) {
       var p = parts[j];
       if (t < p.delay) continue;
@@ -724,9 +753,9 @@
       var app = Math.min(1, (t - p.delay) / 0.5);
       var al = p.alpha * app;
       if (p.tw) al *= 0.7 + 0.3 * Math.sin(t * 2.6 + p.phase);
+      if (p.size !== lastSz) { ctx.font = p.size + 'px ' + SYM; lastSz = p.size; }
+      if (p.col !== lastCol) { ctx.fillStyle = p.col; lastCol = p.col; }
       ctx.globalAlpha = al;
-      ctx.fillStyle = p.col;
-      ctx.font = p.size.toFixed(1) + 'px ' + SYM;
       ctx.fillText(p.ch, p.x, p.y);
     }
 
