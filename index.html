@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#05030c">
+<title>for my love</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #05030c; overflow: hidden;
+  }
+  body {
+    position: fixed; inset: 0;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #c { display: block; width: 100%; height: 100%; touch-action: manipulation; cursor: pointer; }
+  #hint {
+    position: fixed; left: 0; right: 0;
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    text-align: center;
+    color: rgba(255, 214, 232, .55);
+    font: 400 12px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    letter-spacing: .18em;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1.4s ease;
+  }
+  #hint.on { opacity: 1; }
+
+  /* ---------- квест ---------- */
+  [hidden] { display: none !important; }
+  #ui {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #ui.hide { display: none; }
+  .card {
+    pointer-events: auto;
+    width: min(92vw, 430px);
+    padding: 30px 28px;
+    border-radius: 24px;
+    background: rgba(16, 8, 30, .80);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, .14);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .08);
+    text-align: center;
+    animation: pop .45s cubic-bezier(.2, 1.4, .4, 1);
+  }
+  .card.mini {
+    position: fixed;
+    top: calc(18px + env(safe-area-inset-bottom, 0px));
+    left: 50%; transform: translateX(-50%);
+    width: auto; max-width: 92vw;
+    padding: 13px 24px;
+    animation: none;
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: scale(.85) translateY(14px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-7px); }
+    50% { transform: translateX(6px); }
+    75% { transform: translateX(-4px); }
+  }
+  .card h1 {
+    margin: 8px 0 10px;
+    font: italic 600 30px/1.2 Georgia, "Times New Roman", serif;
+    color: #ffd9e6;
+    letter-spacing: .02em;
+  }
+  .card h2 {
+    margin: 6px 0 10px;
+    font: italic 600 22px/1.2 Georgia, serif;
+    color: #ffd9e6;
+  }
+  .card p {
+    margin: 0 0 18px;
+    font: 400 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: rgba(255, 240, 245, .88);
+  }
+  .card .q { font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 14px; }
+  .card .comp { color: #ffd1e3; font-size: 16px; }
+  .badge {
+    display: inline-block;
+    font: 600 11px/1 system-ui, sans-serif;
+    letter-spacing: .16em; text-transform: uppercase;
+    color: rgba(255, 214, 232, .75);
+    border: 1px solid rgba(255, 214, 232, .3);
+    border-radius: 999px;
+    padding: 6px 12px;
+    margin-bottom: 6px;
+  }
+  .ok-badge { color: #8ce99a; border-color: rgba(140, 233, 154, .4); }
+  .big-heart {
+    font-size: 34px; line-height: 1;
+    color: #ff5f78;
+    text-shadow: 0 0 22px rgba(255, 95, 120, .8);
+    animation: beat 1.4s ease-in-out infinite;
+  }
+  @keyframes beat {
+    0%, 100% { transform: scale(1); }
+    30% { transform: scale(1.18); }
+    60% { transform: scale(1); }
+  }
+  .opts { display: block; }
+  .opt {
+    display: block; width: 100%;
+    margin: 10px 0; padding: 14px 18px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, .16);
+    background: rgba(255, 255, 255, .06);
+    color: #fff;
+    font: 400 15px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
+    text-align: left; cursor: pointer;
+    transition: background .15s, border-color .15s, transform .1s;
+  }
+  .opt:hover { background: rgba(255, 255, 255, .13); border-color: rgba(255, 255, 255, .32); }
+  .opt:active { transform: scale(.98); }
+  .opt.bad { animation: shake .35s; border-color: rgba(255, 95, 120, .6); }
+  .opt.ok { background: rgba(105, 219, 124, .22); border-color: #69db7c; }
+  .warn {
+    margin: 4px 0 0 !important;
+    font-size: 13px !important;
+    color: rgba(255, 214, 232, .75) !important;
+  }
+  .btn {
+    font: 600 15px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: #fff;
+    background: linear-gradient(135deg, #ff6fa5, #c084fc);
+    border: 0; border-radius: 999px;
+    padding: 15px 28px;
+    cursor: pointer;
+    letter-spacing: .04em;
+    box-shadow: 0 10px 28px rgba(255, 111, 165, .35);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(255, 111, 165, .5); }
+  .btn:active { transform: translateY(0) scale(.97); }
+  .btn.ghost {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, .3);
+    box-shadow: none;
+  }
+  .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .hid {
+    position: fixed;
+    pointer-events: auto;
+    font-size: 36px; line-height: 1;
+    color: #ff5f78;
+    text-shadow: 0 0 18px rgba(255, 95, 120, .9);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    animation: floaty 2.6s ease-in-out infinite, beat 1.4s ease-in-out infinite;
+    z-index: 11;
+    transition: transform .12s;
+  }
+  .hid:hover { transform: scale(1.25); }
+  @keyframes floaty {
+    0%, 100% { margin-top: 0; }
+    50% { margin-top: -12px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">коснись, чтобы посыпались искры ✦</div>
+
+<div id="ui" class="hide">
+  <div class="card" data-step="intro">
+    <div class="big-heart">♥</div>
+    <h1>Привет, любимая</h1>
+    <p>Я спрятал тут кое-что из цветов и разноцветных символов.<br>
+       Внутри — три вопроса и три спрятанных сердечка. Погнали?</p>
+    <button class="btn" data-go="q1">Начать квест ✦</button>
+  </div>
+
+  <div class="card" data-step="q1" hidden data-next="a1">
+    <span class="badge">вопрос 1 / 3</span>
+    <p class="q">Кто здесь самая красивая?</p>
+    <div class="opts">
+      <button class="opt" data-ok="0">Ну, я 😌</button>
+      <button class="opt" data-ok="1">Ты 💗</button>
+      <button class="opt" data-ok="0">Я, конечно 😎</button>
+    </div>
+    <p class="warn" hidden>Хм, я бы выбрал другой вариант 😉</p>
+  </div>
+
+  <div class="card" data-step="a1" hidden>
+    <span class="badge ok-badge">верно!</span>
+    <p class="comp">Ты — самая красивая на свете, и это не обсуждается ✨
+       Каждый день ты становишься всё краше.</p>
+    <button class="btn" data-go="q2">Дальше</button>
+  </div>
+
+  <div class="card" data-step="q2" hidden data-next="a2">
+    <span class="badge">вопрос 2 / 3</span>
+    <p class="q">Как часто я о тебе думаю?</p>
+    <div class="opts">
+      <button class="opt" data-ok="0">Только вечером</button>
+      <button class="opt" data-ok="0">Когда скучно</button>
+      <button class="opt" data-ok="1">Всегда, постоянно</button>
+    </div>
+    <p class="warn" hidden>Почти… попробуй ещё раз 😉</p>
+  </div>
+
+  <div class="card" data-step="a2" hidden>
+    <span class="badge ok-badge">верно!</span>
+    <p class="comp">Конечно! Ты — первое, о чём я думаю утром,
+       и последнее — вечером 🌸</p>
+    <button class="btn" data-go="q3">Дальше</button>
+  </div>
+
+  <div class="card" data-step="q3" hidden data-next="a3">
+    <span class="badge">вопрос 3 / 3</span>
+    <p class="q">Сколько цветов в этом букете?</p>
+    <div class="opts">
+      <button class="opt" data-ok="0">Пять штук</button>
+      <button class="opt" data-ok="0">Миллион</button>
+      <button class="opt" data-ok="1">Столько, сколько твоих улыбок</button>
+    </div>
+    <p class="warn" hidden>Ты близко… но не совсем 😉</p>
+  </div>
+
+  <div class="card" data-step="a3" hidden>
+    <span class="badge ok-badge">верно!</span>
+    <p class="comp">Точно! А улыбок у тебя — бесконечно много 🌷</p>
+    <button class="btn" data-go="hearts">Финал →</button>
+  </div>
+
+  <div class="card mini" data-step="hearts" hidden>
+    <p class="q">Найди три спрятанных сердечка: <b id="hcount">0/3</b></p>
+  </div>
+
+  <div class="card" data-step="final" hidden>
+    <div class="big-heart">♥</div>
+    <h1>Ты нашла их все!</h1>
+    <p class="comp">Спасибо, что ты есть. Ты — мой самый любимый
+       человек на свете. С любовью, навсегда ♥</p>
+    <div class="row">
+      <button class="btn" data-act="close">Посмотреть букет</button>
+      <button class="btn ghost" data-act="again">Ещё раз ✦</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d', { alpha: false });
+  var hintEl = document.getElementById('hint');
+
+  var q = new URLSearchParams(location.search);
+  var fixW = parseInt(q.get('w') || '0', 10) || 0;
+  var fixH = parseInt(q.get('h') || '0', 10) || 0;
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- символы и палитры ---------- */
+  var SYM = '"Apple Symbols","Segoe UI Symbol","Noto Sans Symbols 2",system-ui,sans-serif';
+  var PETALS  = ['❀', '✿', '✾', '❁', '⚘'];
+  var CENTERS = ['✦', '✳', '✱', '❋', '✴'];
+  var STEMS   = ['·', '∙', '•'];
+  var LEAVES  = ['❦', '❧', '☘', '❖'];
+  var HEARTS  = ['♥', '♡', '❤'];
+  var SPARKS  = ['✦', '✦', '✧', '✦', '✧', '•'];
+  var AMB     = ['❀', '✿', '✦', '·', '♡', '✾', '✧', '❋'];
+
+  var PAL = {
+    pink:   ['#ff7eb6', '#ff9ec6', '#ffb3d1', '#ff6fa5'],
+    red:    ['#ff5f78', '#ff8a9e', '#e64a63', '#ff9db0'],
+    purple: ['#c084fc', '#a78bfa', '#d8b4fe', '#b388ff'],
+    gold:   ['#ffd166', '#ffe29a', '#ffc94d', '#ffde8a'],
+    cream:  ['#fff0f5', '#ffe4ec', '#fff8e7', '#ffd9e6'],
+    green:  ['#69db7c', '#40c057', '#8ce99a', '#51cf66']
+  };
+  var SPARK_COLORS = ['#ffd166', '#ff9ec6', '#fff0f5', '#c084fc', '#8ce99a'];
+  var AMB_COLORS = [].concat(PAL.pink, PAL.red, PAL.purple, PAL.gold, PAL.cream);
+
+  /* ---------- состояние ---------- */
+  var W = 0, H = 0, DPR = 1;
+  var parts = [], amb = [], sparks = [];
+  var bgGrad = null, glowGrad = null;
+  var t0 = 0, last = 0, firstBuild = true, started = false;
+  var textGlow = null;
+
+  function pick(a) { return a[(Math.random() * a.length) | 0]; }
+  function rr(a, b) { return a + Math.random() * (b - a); }
+
+  /* ---------- частица ---------- */
+  function P(tx, ty, delay, ch, col, size, opt) {
+    opt = opt || {};
+    var x, y;
+    if (opt.near) {
+      x = tx + rr(-60, 60);
+      y = ty + rr(-60, 60);
+    } else {
+      var a = Math.random() * Math.PI * 2;
+      var rad = Math.max(W, H) * rr(0.55, 0.95);
+      x = W / 2 + Math.cos(a) * rad;
+      y = H / 2 + Math.sin(a) * rad;
+    }
+    return {
+      bx: tx, by: ty, x: x, y: y, vx: 0, vy: 0,
+      delay: delay, ch: ch, col: col, size: size,
+      k: 0.016 * rr(0.75, 1.35),
+      phase: opt.phase !== undefined ? opt.phase : rr(0, Math.PI * 2),
+      wobA: opt.wobA !== undefined ? opt.wobA : 1.6,
+      wobF: opt.wobF !== undefined ? opt.wobF : rr(0.5, 1.1),
+      tw: !!opt.tw,
+      alpha: opt.alpha !== undefined ? opt.alpha : 1
+    };
+  }
+
+  /* ---------- текст: сэмплируем пиксели ---------- */
+  function addText(str, cx, cy, fsTarget) {
+    var off = document.createElement('canvas');
+    var o = off.getContext('2d');
+    var FS = 200;
+    var font = 'italic 600 ' + FS + 'px Georgia,"Times New Roman",serif';
+    o.font = font;
+    var tw = o.measureText(str).width;
+    off.width = Math.ceil(tw) + 40;
+    off.height = Math.ceil(FS * 1.6);
+    o = off.getContext('2d');
+    o.font = font;
+    o.textBaseline = 'middle';
+    o.fillStyle = '#fff';
+    o.fillText(str, 20, off.height / 2);
+
+    var scale = Math.min(fsTarget / FS, (W * 0.88) / tw);
+    var img = o.getImageData(0, 0, off.width, off.height).data;
+    var step = 6;
+    var cell = 5.0;
+    var used = Object.create(null);
+    var count = 0;
+    var size = Math.max(8, fsTarget * 0.16);
+    textGlow = { str: str, x: cx, y: cy, fs: FS * scale };
+
+    for (var sy = 0; sy < off.height; sy += step) {
+      for (var sx = 0; sx < off.width; sx += step) {
+        if (img[(sy * off.width + sx) * 4 + 3] < 110) continue;
+        var x = cx - tw * scale / 2 + (sx - 20) * scale;
+        var y = cy + (sy - off.height / 2) * scale;
+        var key = Math.round(x / cell) + '_' + Math.round(y / cell);
+        if (used[key]) continue;
+        used[key] = 1;
+        var hue = 330 + 75 * (sx / off.width);
+        var col = 'hsl(' + hue.toFixed(0) + ',88%,' +
+                  (74 + 8 * Math.sin(sx * 0.04)).toFixed(0) + '%)';
+        parts.push(P(x, y, 3.0 + (sx / off.width) * 0.55 + Math.random() * 0.35,
+                     pick(SPARKS), col, size * rr(0.85, 1.15),
+                     { tw: true, wobA: 0.9, wobF: rr(0.5, 1.0), near: !firstBuild || reduce }));
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /* ---------- сборка сцены ---------- */
+  function build() {
+    var intro = firstBuild && !reduce;
+    parts = [];
+    var portrait = H >= W;
+    var cx = W / 2;
+    var R = Math.min(W * 0.92, H * 0.60) * 0.132;
+    var BCy = H * (portrait ? 0.36 : 0.36);
+    var Gy = H * (portrait ? 0.60 : 0.62);
+    var near = !intro;
+
+    var flowers = [
+      { dx:  0.00, dy: -1.55, m: 1.12, pal: PAL.pink },
+      { dx: -1.85, dy: -0.45, m: 1.00, pal: PAL.red },
+      { dx:  1.85, dy: -0.45, m: 1.00, pal: PAL.purple },
+      { dx: -0.95, dy:  0.60, m: 0.90, pal: PAL.gold },
+      { dx:  0.95, dy:  0.60, m: 0.95, pal: PAL.cream }
+    ];
+
+    /* стебли: растут от ленты вверх к цветам */
+    flowers.forEach(function (f, i) {
+      var fx = cx + f.dx * R;
+      var fy = BCy + f.dy * R;
+      var FR = R * f.m;
+      var sx = fx, sy = fy + FR * 0.35;
+      var dxv = cx - sx, dyv = Gy - sy;
+      var len = Math.hypot(dxv, dyv) || 1;
+      var px = -dyv / len, py = dxv / len;
+      var bow = (i - 2) * R * 0.22;
+      var qx = (sx + cx) / 2 + px * bow;
+      var qy = (sy + Gy) / 2 + py * bow;
+      var N = 18;
+      var stemBase = 0.30 + i * 0.05;
+      var leafDelay = [];
+
+      for (var j = 0; j <= N; j++) {
+        var u = j / N;                       // 0 — у цветка, 1 — у ленты
+        var x = (1 - u) * (1 - u) * sx + 2 * (1 - u) * u * qx + u * u * cx;
+        var y = (1 - u) * (1 - u) * sy + 2 * (1 - u) * u * qy + u * u * Gy;
+        var d = stemBase + (N - j) * 0.026;  // рост снизу вверх
+        parts.push(P(x, y, d, pick(STEMS), pick(PAL.green), R * 0.21,
+          { near: near, wobA: 1.2, phase: i * 0.9 }));
+        if (j === 6 || j === 13) leafDelay.push({ u: u, d: d, x: x, y: y, side: (i + j) % 2 ? 1 : -1 });
+      }
+
+      /* листья */
+      leafDelay.forEach(function (L) {
+        parts.push(P(L.x + px * R * 0.60 * L.side, L.y + py * R * 0.60 * L.side,
+          L.d + 0.12, pick(LEAVES), pick(PAL.green), R * 0.48,
+          { near: near, wobA: 1.6, phase: i * 0.9 + 0.3 }));
+      });
+    });
+
+    /* лента-бантик */
+    parts.push(P(cx, Gy, 1.12, '♥', '#ff5f78', R * 0.55,
+      { near: near, tw: true, wobA: 2.2, wobF: 0.6 }));
+    for (var b = 0; b < 6; b++) {
+      var ba = (b / 6) * Math.PI * 2;
+      parts.push(P(cx + Math.cos(ba) * R * 0.62, Gy + Math.sin(ba) * R * 0.30,
+        1.18 + b * 0.04, pick(HEARTS), pick(PAL.red.concat(PAL.pink)), R * 0.30,
+        { near: near, tw: true, wobA: 2.4, wobF: 0.7 }));
+    }
+
+    /* цветы */
+    flowers.forEach(function (f, fi) {
+      var fx = cx + f.dx * R;
+      var fy = BCy + f.dy * R;
+      var FR = R * f.m;
+      var base = 1.30 + fi * 0.18;
+      var ph = fi * 0.9;
+
+      /* внешние лепестки */
+      var NP = 8;
+      for (var i = 0; i < NP; i++) {
+        var a = (i / NP) * Math.PI * 2 - Math.PI / 2;
+        for (var t = 0.28; t <= 1.001; t += 0.17) {
+          var l = FR * t;
+          var w = FR * 0.30 * Math.sin(Math.PI * Math.min(1, t * 1.05));
+          [-0.8, 0, 0.8].forEach(function (c) {
+            parts.push(P(
+              fx + Math.cos(a) * l - Math.sin(a) * w * c,
+              fy + Math.sin(a) * l + Math.cos(a) * w * c,
+              base + Math.random() * 0.35,
+              pick(PETALS), pick(f.pal), FR * 0.38 * rr(0.85, 1.15),
+              { near: near, phase: ph + rr(0, 0.5), wobA: 2.4, wobF: 0.55 }));
+          });
+        }
+      }
+
+      /* внутренние лепестки */
+      var NI = 6;
+      for (var i2 = 0; i2 < NI; i2++) {
+        var a2 = (i2 / NI) * Math.PI * 2 - Math.PI / 2 + Math.PI / NI;
+        for (var t2 = 0.30; t2 <= 1.001; t2 += 0.25) {
+          var l2 = FR * 0.62 * t2;
+          var w2 = FR * 0.20 * Math.sin(Math.PI * Math.min(1, t2 * 1.05));
+          [-0.75, 0.75].forEach(function (c2) {
+            parts.push(P(
+              fx + Math.cos(a2) * l2 - Math.sin(a2) * w2 * c2,
+              fy + Math.sin(a2) * l2 + Math.cos(a2) * w2 * c2,
+              base + 0.1 + Math.random() * 0.3,
+              pick(PETALS), pick(f.pal), FR * 0.30 * rr(0.85, 1.15),
+              { near: near, phase: ph + rr(0, 0.5), wobA: 2.4, wobF: 0.55 }));
+          });
+        }
+      }
+
+      /* серединка */
+      for (var c3 = 0; c3 < 11; c3++) {
+        var ca = Math.random() * Math.PI * 2;
+        var cr = Math.random() * FR * 0.24;
+        parts.push(P(fx + Math.cos(ca) * cr, fy + Math.sin(ca) * cr,
+          base + 0.15 + Math.random() * 0.3,
+          pick(CENTERS), pick(PAL.gold), FR * 0.26 * rr(0.8, 1.2),
+          { near: near, phase: ph, wobA: 2.4, wobF: 0.55, tw: true }));
+      }
+    });
+
+    /* надпись */
+    var textCy = H * (portrait ? 0.78 : 0.80);
+    var fsTarget = Math.min(H * 0.115, W * 0.17);
+    addText('for my love', cx, textCy, fsTarget);
+
+    /* фон: дождь из символов */
+    amb = [];
+    var n = Math.round(Math.min(190, Math.max(70, (W * H) / 9000)));
+    for (var m = 0; m < n; m++) {
+      amb.push({
+        x: Math.random() * W, y: Math.random() * H,
+        vy: rr(0.12, 0.5), f: rr(0.3, 0.9), ph: rr(0, 6.3), tf: rr(1, 3),
+        ch: pick(AMB), col: pick(AMB_COLORS), sz: rr(8, 16), al: rr(0.10, 0.35)
+      });
+    }
+
+    firstBuild = false;
+    t0 = performance.now();
+  }
+
+  /* ---------- вспышка по тапу ---------- */
+  function burst(bx, by) {
+    var reach = Math.min(W, H) * 0.6;
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (performance.now() / 1000 - t0 / 1000 < p.delay) continue;
+      var dx = p.x - bx, dy = p.y - by;
+      var d = Math.hypot(dx, dy) || 1;
+      var f = Math.max(0, 1 - d / reach);
+      var imp = (6 + 16 * f) * rr(0.5, 1.5);
+      p.vx += (dx / d) * imp;
+      p.vy += (dy / d) * imp;
+    }
+    for (var s = 0; s < 30; s++) {
+      var ang = Math.random() * Math.PI * 2;
+      var sp = rr(2, 8);
+      sparks.push({
+        x: bx, y: by,
+        vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+        life: rr(0.6, 1.3),
+        ch: pick(SPARKS), col: pick(SPARK_COLORS), sz: rr(10, 18), ph: rr(0, 6.3)
+      });
+    }
+    hintEl.classList.remove('on');
+  }
+
+  window.addEventListener('pointerdown', function (e) {
+    if (e.target && e.target.closest && e.target.closest('#ui')) return;
+    burst(e.clientX, e.clientY);
+  }, { passive: true });
+
+  /* ---------- мини-квест ---------- */
+  var found = 0;
+
+  function updateH() {
+    var el = document.getElementById('hcount');
+    if (el) el.textContent = found + '/3';
+  }
+
+  function spawnHearts() {
+    found = 0;
+    updateH();
+    var host = document.getElementById('ui');
+    for (var i = 0; i < 3; i++) {
+      var el = document.createElement('div');
+      el.className = 'hid';
+      el.textContent = '♥';
+      el.style.left = (8 + Math.random() * 78) + '%';
+      el.style.top = (30 + Math.random() * 52) + '%';
+      el.style.animationDelay = (Math.random() * 1.5) + 's, ' + (Math.random() * 1.4) + 's';
+      el.addEventListener('pointerdown', function (ev) {
+        ev.stopPropagation();
+        var r = this.getBoundingClientRect();
+        burst(r.left + r.width / 2, r.top + r.height / 2);
+        this.remove();
+        found++;
+        updateH();
+        if (found >= 3) setTimeout(function () { showStep('final'); }, 650);
+      });
+      host.appendChild(el);
+    }
+  }
+
+  function celebrate() {
+    setTimeout(function () { burst(W / 2, H * 0.34); }, 150);
+    setTimeout(function () { burst(W * 0.28, H * 0.52); }, 600);
+    setTimeout(function () { burst(W * 0.72, H * 0.52); }, 1050);
+  }
+
+  function showStep(name) {
+    var cards = document.querySelectorAll('.card');
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].hidden = cards[i].getAttribute('data-step') !== name;
+    }
+    var olds = document.querySelectorAll('.hid');
+    for (var j = 0; j < olds.length; j++) olds[j].remove();
+    document.getElementById('ui').classList.toggle('hide', !name);
+    if (name === 'hearts') spawnHearts();
+    if (name === 'final') celebrate();
+  }
+
+  document.getElementById('ui').addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || !t.getAttribute) return;
+
+    var go = t.getAttribute('data-go');
+    if (go) { showStep(go); return; }
+
+    if (t.classList && t.classList.contains('opt')) {
+      if (t.getAttribute('data-ok') === '1') {
+        t.classList.add('ok');
+        var card = t.closest('.card');
+        var next = card ? card.getAttribute('data-next') : null;
+        setTimeout(function () { if (next) showStep(next); }, 500);
+      } else {
+        t.classList.add('bad');
+        var w = t.closest('.card') ? t.closest('.card').querySelector('.warn') : null;
+        if (w) w.hidden = false;
+        setTimeout(function () { t.classList.remove('bad'); }, 450);
+      }
+      return;
+    }
+
+    var act = t.getAttribute('data-act');
+    if (act === 'close') {
+      showStep(null);
+      hintEl.classList.add('on');
+    } else if (act === 'again') {
+      showStep('intro');
+    }
+  });
+
+  /* ---------- размеры ---------- */
+  function resize() {
+    W = fixW || window.innerWidth;
+    H = fixH || window.innerHeight;
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+    bgGrad.addColorStop(0, '#05030c');
+    bgGrad.addColorStop(0.5, '#0d0620');
+    bgGrad.addColorStop(1, '#140926');
+
+    var gR = Math.max(W, H) * 0.62;
+    glowGrad = ctx.createRadialGradient(W / 2, H * 0.36, 0, W / 2, H * 0.36, gR);
+    glowGrad.addColorStop(0, 'rgba(255,95,150,0.14)');
+    glowGrad.addColorStop(0.45, 'rgba(150,80,220,0.08)');
+    glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
+    build();
+    if (!started) { started = true; last = 0; requestAnimationFrame(frame); }
+  }
+
+  var rT = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(rT); rT = setTimeout(resize, 150);
+  });
+  window.addEventListener('orientationchange', function () {
+    setTimeout(resize, 300);
+  });
+
+  /* ---------- цикл ---------- */
+  function frame(now) {
+    var dt = Math.min(50, now - (last || now - 16));
+    last = now;
+    var h = dt / 16.666;
+    var t = (now - t0) / 1000;
+    var dampH = Math.pow(0.90, h);
+
+    /* фон */
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = glowGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    /* фоновые символы */
+    for (var i = 0; i < amb.length; i++) {
+      var a = amb[i];
+      a.y += a.vy * h;
+      a.x += Math.sin(t * a.f + a.ph) * 0.25 * h;
+      if (a.y > H + 30) { a.y = -30; a.x = Math.random() * W; }
+      if (a.x < -30) a.x = W + 20;
+      else if (a.x > W + 30) a.x = -20;
+      ctx.globalAlpha = a.al * (0.6 + 0.4 * Math.sin(t * a.tf + a.ph));
+      ctx.fillStyle = a.col;
+      ctx.font = a.sz.toFixed(1) + 'px ' + SYM;
+      ctx.fillText(a.ch, a.x, a.y);
+    }
+
+    /* мягкое свечение под надписью */
+    if (textGlow) {
+      var gA = Math.min(1, Math.max(0, (t - 3.4) / 1.4));
+      if (gA > 0) {
+        ctx.save();
+        ctx.font = 'italic 600 ' + textGlow.fs.toFixed(1) + 'px Georgia,"Times New Roman",serif';
+        ctx.fillStyle = 'rgba(255,170,205,' + (0.17 * gA).toFixed(3) + ')';
+        ctx.shadowColor = 'rgba(255,120,170,0.6)';
+        ctx.shadowBlur = 40;
+        ctx.fillText(textGlow.str, textGlow.x, textGlow.y);
+        ctx.restore();
+      }
+    }
+
+    /* искры от тапа */
+    for (var s = sparks.length - 1; s >= 0; s--) {
+      var sk = sparks[s];
+      sk.life -= dt / 1000;
+      if (sk.life <= 0) { sparks.splice(s, 1); continue; }
+      sk.vx *= Math.pow(0.94, h);
+      sk.vy *= Math.pow(0.94, h);
+      sk.vy -= 0.05 * h;
+      sk.x += sk.vx * h;
+      sk.y += sk.vy * h;
+      var lf = sk.life;
+      ctx.globalAlpha = Math.min(1, lf * 1.6) * (0.7 + 0.3 * Math.sin(t * 6 + sk.ph));
+      ctx.fillStyle = sk.col;
+      ctx.font = (sk.sz * (0.45 + 0.55 * Math.min(1, lf))).toFixed(1) + 'px ' + SYM;
+      ctx.fillText(sk.ch, sk.x, sk.y);
+    }
+
+    /* частицы сцены */
+    for (var j = 0; j < parts.length; j++) {
+      var p = parts[j];
+      if (t < p.delay) continue;
+      var tx = p.bx + Math.sin(t * p.wobF + p.phase) * p.wobA;
+      var ty = p.by + Math.cos(t * p.wobF * 0.83 + p.phase) * p.wobA * 0.65;
+      var dx = tx - p.x, dy = ty - p.y;
+      p.vx = (p.vx + dx * p.k * h) * dampH;
+      p.vy = (p.vy + dy * p.k * h) * dampH;
+      p.x += p.vx * h;
+      p.y += p.vy * h;
+      var app = Math.min(1, (t - p.delay) / 0.5);
+      var al = p.alpha * app;
+      if (p.tw) al *= 0.7 + 0.3 * Math.sin(t * 2.6 + p.phase);
+      ctx.globalAlpha = al;
+      ctx.fillStyle = p.col;
+      ctx.font = p.size.toFixed(1) + 'px ' + SYM;
+      ctx.fillText(p.ch, p.x, p.y);
+    }
+
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- старт ---------- */
+  resize();
+  setTimeout(function () {
+    showStep('intro');
+  }, reduce ? 700 : 5600);
+})();
+</script>
+</body>
+</html>
